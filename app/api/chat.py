@@ -166,8 +166,10 @@ def _system_prompt() -> str:
         "- Răspunsuri scurte, 2–4 propoziții\n"
         "- Fără introduceri de tipul «Înțeleg», «Sigur», «Desigur»\n"
         "- Vorbești mereu în română\n\n"
-        "Dacă informația nu este în baza de cunoștințe, spui că nu poți răspunde și sugerezi "
-        "programarea unei demonstrații cu un consultant RParking."
+        "Dacă informația nu este în baza de cunoștințe, spui că nu poți răspunde la acel subiect.\n\n"
+        "IMPORTANT: Nu menționa niciodată demonstrații, demo-uri sau programări în răspunsurile tale. "
+        "Nu întreba utilizatorul dacă dorește un demo sau să fie contactat. "
+        "Răspunde DOAR la întrebarea pusă, fără niciun call-to-action la final."
     )
 
 
@@ -428,4 +430,7 @@ def chat():
         except ValueError as exc:
             return jsonify({"error": "config_error", "message": str(exc)}), 500
 
+    demo_marker = _DEMO_OFFER.strip()
+    if demo_marker in reply:
+        reply = reply[:reply.index(demo_marker)].rstrip()
     return _respond(reply.rstrip() + _DEMO_OFFER)
