@@ -78,6 +78,35 @@ def send_transcript_document(*, lead_ref: str, messages: list[dict]) -> None:
     response.raise_for_status()
 
 
+def send_manager_transfer_notification(*, name: str, phone: str, subject: str) -> None:
+    """Send a Telegram message when a user requests to speak with a manager.
+
+    Raises ValueError if env vars are missing.
+    Raises requests.RequestException on failure.
+    """
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+
+    if not token:
+        raise ValueError("TELEGRAM_BOT_TOKEN is not set.")
+    if not chat_id:
+        raise ValueError("TELEGRAM_CHAT_ID is not set.")
+
+    text = (
+        f"🔔 Transfer Manager RParking:\n"
+        f"Nume: {name or '—'}\n"
+        f"Telefon: {phone or '—'}\n"
+        f"Subiect: {subject or '—'}"
+    )
+
+    response = requests.post(
+        f"{_API_BASE}/bot{token}/sendMessage",
+        json={"chat_id": chat_id, "text": text},
+        timeout=10,
+    )
+    response.raise_for_status()
+
+
 def send_reservation_notification(
     *, name: str, phone: str, email: str, project_type: str, reserved_datetime: str
 ) -> None:

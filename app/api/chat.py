@@ -11,6 +11,7 @@ from ..services.llm_client import LLMClient
 from ..services.lead_service import LeadService
 from ..services.telegram_service import (
     send_lead_notification,
+    send_manager_transfer_notification,
     send_transcript_document,
 )
 from ..services.validators import is_valid_email, is_valid_phone
@@ -218,6 +219,103 @@ def _kb_search(user_text: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Manager transfer intent + flow
+# ---------------------------------------------------------------------------
+
+_MANAGER_KEYWORDS = {
+    "manager", "sef", "șef", "operator", "uman", "human",
+    "persoana", "persoană", "persoane", "vorbesc cu", "sa vorbesc",
+    "să vorbesc", "angajat", "contact direct", "suna-ma", "sunați-mă",
+    "sunati-ma", "responsabil", "reprezentant", "agent",
+}
+
+
+def _detect_manager_intent(text: str, api_key: str, model: str) -> bool:
+    """Returns True if user wants to speak with a human manager/operator."""
+    t = _normalize(text)
+    if any(kw in t for kw in _MANAGER_KEYWORDS):
+        return True
+    if not api_key:
+        return False
+    classifier = LLMClient(api_key=api_key, model=model)
+    messages = [
+        {"role": "system", "content": (
+            "You are a STRICT classifier. "
+            "Determine if the user's message expresses a desire to speak with a human "
+            "manager, operator, or agent (in any language — Romanian, English, Russian). "
+            "Reply ONLY with: YES | NO. No other text."
+        )},
+        {"role": "user", "content": text},
+    ]
+    try:
+        result = classifier.chat(messages=messages).strip().upper()
+        return result == "YES"
+    except Exception:
+        return False
+
+
+def _handle_manager_transfer(conversation_id: str, user_text: str, meta: dict) -> str | None:
+    """Handle 3-step manager transfer collection: name → phone → subject."""
+    mt_state = meta.get("manager_transfer") or {}
+    if not mt_state.get("active"):
+        return None
+
+    step = mt_state.get("step")
+    draft = dict(mt_state.get("draft") or {})
+
+    if step == "name":
+        name = user_text.strip()
+        if len(name) < 2:
+            return "Vă rog să îmi spuneți numele dvs. (minim 2 caractere)."
+        draft["name"] = name
+        mt_state.update({"step": "phone", "draft": draft})
+        _store.update_meta(conversation_id, {"manager_transfer": mt_state})
+        return "Numărul dvs. de telefon? (ex: 07xx xxx xxx / +40...)"
+
+    if step == "phone":
+        if not is_valid_phone(user_text.strip()):
+            return "Nu am recunoscut un număr valid. Vă rog să îl scrieți din nou (ex: 07xx xxx xxx / +40...)."
+        draft["phone"] = user_text.strip()
+        mt_state.update({"step": "subject", "draft": draft})
+        _store.update_meta(conversation_id, {"manager_transfer": mt_state})
+        return "Cu ce subiect doriți să vorbiți cu un manager RParking?"
+
+    if step == "subject":
+        subject = user_text.strip()
+        if len(subject) < 3:
+            return "Vă rog să descrieți pe scurt subiectul (minim 3 caractere)."
+        draft["subject"] = subject
+        mt_state.update({"step": None, "active": False, "draft": draft})
+        _store.update_meta(conversation_id, {"manager_transfer": mt_state, "stage": "ended"})
+
+        try:
+            send_manager_transfer_notification(
+                name=draft.get("name", ""),
+                phone=draft.get("phone", ""),
+                subject=subject,
+            )
+        except Exception as exc:
+            current_app.logger.warning("Manager transfer notification failed: %s", exc)
+
+        try:
+            history = _store.get(conversation_id)
+            send_transcript_document(
+                lead_ref=f"Manager Transfer — {draft.get('name', 'necunoscut')}",
+                messages=history,
+            )
+        except Exception as exc:
+            current_app.logger.warning("Manager transfer transcript failed: %s", exc)
+
+        return (
+            "Mulțumesc! Datele dvs. au fost transmise.\n"
+            "Un manager RParking vă va contacta în cel mai scurt timp.\n\n"
+            "Vă mulțumim că ați contactat RParking. O zi bună!"
+        )
+
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Lead capture flow handler
 # ---------------------------------------------------------------------------
 
@@ -358,6 +456,7 @@ def chat():
         _store.update_meta(conversation_id, {
             "stage": "chatting",
             "lead": {"active": False, "step": None, "draft": {}},
+            "manager_transfer": {"active": False, "step": None, "draft": {}},
         })
         return jsonify({"conversation_id": conversation_id, "reply": greeting})
 
@@ -393,6 +492,23 @@ def chat():
     if lead_reply is not None:
         _store.append(conversation_id, {"role": "user", "content": user_text})
         return _respond(lead_reply)
+
+    # ── Active manager transfer flow ──────────────────────────────────────────
+    mt_reply = _handle_manager_transfer(conversation_id, user_text, meta)
+    if mt_reply is not None:
+        _store.append(conversation_id, {"role": "user", "content": user_text})
+        return _respond(mt_reply)
+
+    # ── Manager intent check (only when no lead capture is active) ────────────
+    if _detect_manager_intent(user_text, api_key, model):
+        _store.update_meta(conversation_id, {
+            "manager_transfer": {"active": True, "step": "name", "draft": {}},
+        })
+        _store.append(conversation_id, {"role": "user", "content": user_text})
+        return _respond(
+            "Înțeles! Vă voi pune în legătură cu un manager RParking.\n"
+            "Cum vă numiți, vă rog?"
+        )
 
     # ── Stage: chatting — KB + LLM, demo offer after every reply ─────────────
     history = _store.get(conversation_id)
