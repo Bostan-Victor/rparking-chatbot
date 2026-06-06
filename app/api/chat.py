@@ -17,7 +17,7 @@ from ..services.validators import is_valid_email, is_valid_phone
 
 # ---------------------------------------------------------------------------
 # RParking chatbot — flow: open → chatting → lead_capture → ended
-# Every LLM reply ends with a demo invitation.
+# Demo offer appended only when buying intent is detected (once per conversation).
 # ---------------------------------------------------------------------------
 
 
@@ -109,6 +109,47 @@ def _classify_yes_no(text: str, api_key: str, model: str) -> str:
         return "UNKNOWN"
     except Exception:
         return "UNKNOWN"
+
+
+_BUYING_INTENT_KEYWORDS = {
+    "preț", "pret", "cost", "costă", "costa", "cât costă", "cat costa",
+    "ofertă", "oferta", "buget", "investiție", "investitie",
+    "instalare", "implementare", "achiziție", "achizitie",
+    "cardpass", "card pass", "tichete", "qr code",
+    "entry point", "exit point", "pay point",
+    "câte locuri", "cate locuri", "locuri de parcare",
+    "parcare nouă", "parcare noua", "sistem nou",
+    "cum funcționează", "cum functioneaza",
+    "cum se instalează", "cum se instaleaza",
+    "vreau să", "vreau sa", "am nevoie",
+    "ne interesează", "ne intereseaza",
+    "pentru parcarea", "pentru parcare",
+}
+
+
+def _has_buying_intent(text: str, api_key: str, model: str) -> bool:
+    """Returns True if the message shows buying/implementation interest."""
+    t = _normalize(text)
+    if any(kw in t for kw in _BUYING_INTENT_KEYWORDS):
+        return True
+    if not api_key:
+        return False
+    classifier = LLMClient(api_key=api_key, model=model)
+    messages = [
+        {"role": "system", "content": (
+            "Ești un clasificator STRICT. "
+            "Determină dacă mesajul utilizatorului arată interes real față de "
+            "achiziționarea sau implementarea unui sistem de management al parcării "
+            "(prețuri, instalare, produse specifice, dimensiunea parcării, cum funcționează). "
+            "Răspunde DOAR cu: YES | NO. Fără text suplimentar."
+        )},
+        {"role": "user", "content": text},
+    ]
+    try:
+        result = classifier.chat(messages=messages).strip().upper()
+        return result == "YES"
+    except Exception:
+        return False
 
 
 def _last_message_had_demo_offer(text: str | None) -> bool:
@@ -357,6 +398,7 @@ def chat():
         ])
         _store.update_meta(conversation_id, {
             "stage": "chatting",
+            "demo_offered": False,
             "lead": {"active": False, "step": None, "draft": {}},
         })
         return jsonify({"conversation_id": conversation_id, "reply": greeting})
@@ -433,4 +475,8 @@ def chat():
     demo_marker = _DEMO_OFFER.strip()
     if demo_marker in reply:
         reply = reply[:reply.index(demo_marker)].rstrip()
-    return _respond(reply.rstrip() + _DEMO_OFFER)
+
+    if not meta.get("demo_offered") and _has_buying_intent(user_text, api_key, model):
+        _store.update_meta(conversation_id, {"demo_offered": True})
+        return _respond(reply.rstrip() + _DEMO_OFFER)
+    return _respond(reply.rstrip())
