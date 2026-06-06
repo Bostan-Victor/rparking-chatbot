@@ -111,47 +111,6 @@ def _classify_yes_no(text: str, api_key: str, model: str) -> str:
         return "UNKNOWN"
 
 
-_BUYING_INTENT_KEYWORDS = {
-    "preț", "pret", "cost", "costă", "costa", "cât costă", "cat costa",
-    "ofertă", "oferta", "buget", "investiție", "investitie",
-    "instalare", "implementare", "achiziție", "achizitie",
-    "cardpass", "card pass", "tichete", "qr code",
-    "entry point", "exit point", "pay point",
-    "câte locuri", "cate locuri", "locuri de parcare",
-    "parcare nouă", "parcare noua", "sistem nou",
-    "cum funcționează", "cum functioneaza",
-    "cum se instalează", "cum se instaleaza",
-    "vreau să", "vreau sa", "am nevoie",
-    "ne interesează", "ne intereseaza",
-    "pentru parcarea", "pentru parcare",
-}
-
-
-def _has_buying_intent(text: str, api_key: str, model: str) -> bool:
-    """Returns True if the message shows buying/implementation interest."""
-    t = _normalize(text)
-    if any(kw in t for kw in _BUYING_INTENT_KEYWORDS):
-        return True
-    if not api_key:
-        return False
-    classifier = LLMClient(api_key=api_key, model=model)
-    messages = [
-        {"role": "system", "content": (
-            "Ești un clasificator STRICT. "
-            "Determină dacă mesajul utilizatorului arată interes real față de "
-            "achiziționarea sau implementarea unui sistem de management al parcării "
-            "(prețuri, instalare, produse specifice, dimensiunea parcării, cum funcționează). "
-            "Răspunde DOAR cu: YES | NO. Fără text suplimentar."
-        )},
-        {"role": "user", "content": text},
-    ]
-    try:
-        result = classifier.chat(messages=messages).strip().upper()
-        return result == "YES"
-    except Exception:
-        return False
-
-
 def _last_message_had_demo_offer(text: str | None) -> bool:
     """Returns True if the last assistant message ended with a demo invitation."""
     if not text:
@@ -398,7 +357,6 @@ def chat():
         ])
         _store.update_meta(conversation_id, {
             "stage": "chatting",
-            "demo_offered": False,
             "lead": {"active": False, "step": None, "draft": {}},
         })
         return jsonify({"conversation_id": conversation_id, "reply": greeting})
@@ -450,7 +408,10 @@ def chat():
             })
             _store.append(conversation_id, {"role": "user", "content": user_text})
             return _respond("Super! Cum vă numiți, vă rog?")
-        # NO or UNKNOWN → fall through to answer normally
+        if yn == "NO":
+            _store.append(conversation_id, {"role": "user", "content": user_text})
+            return _respond("Bine, vă pot ajuta cu altceva?")
+        # UNKNOWN → user ignored offer, fall through to answer normally
 
     # KB + LLM answer
     try:
@@ -476,7 +437,6 @@ def chat():
     if demo_marker in reply:
         reply = reply[:reply.index(demo_marker)].rstrip()
 
-    if not meta.get("demo_offered") and _has_buying_intent(user_text, api_key, model):
-        _store.update_meta(conversation_id, {"demo_offered": True})
+    if snippets:
         return _respond(reply.rstrip() + _DEMO_OFFER)
     return _respond(reply.rstrip())
