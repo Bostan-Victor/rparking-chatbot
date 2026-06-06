@@ -1,5 +1,17 @@
 # RParking — Întrebări Frecvente
 
+### Cât costă un sistem RParking? / Prețuri RParking
+
+RParking nu are un preț fix standard, deoarece fiecare proiect este unic. Costul final se calculează individual, în funcție de:
+- **Tipul sistemului ales** — sistem complet (Entry + Pay + Exit + BackOffice), sistem CardPass (acces NFC/RFID), sistem cu tichete sau sistem QR Code
+- **Dimensiunea parcării** — numărul de locuri de parcare și numărul de benzi de intrare/ieșire necesare
+- **Configurația echipamentelor** — ce stații sunt necesare și ce module opționale sunt dorite
+- **Abonamente** — dacă se dorește gestionarea abonaților lunari (angajați, rezidenți) prin BackOffice
+
+RParking oferă soluții scalabile, atât pentru parcări mici (zeci de locuri), cât și pentru complexe mari (sute de locuri). Pentru a obține o ofertă personalizată, echipa RParking realizează o analiză a proiectului și propune configurația optimă.
+
+
+
 ### Cum intru în parcare?
 
 Puteți utiliza card RFID/NFC, telefon mobil cu NFC, cod QR sau tichet emis la intrare, în funcție de sistemul instalat.
