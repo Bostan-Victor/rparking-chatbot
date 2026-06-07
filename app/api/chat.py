@@ -122,6 +122,47 @@ def _last_message_had_demo_offer(text: str | None) -> bool:
     )
 
 
+_DEMO_REQUEST_KEYWORDS = {
+    "vreau demo", "doresc demo", "am nevoie de demo",
+    "vreau demonstratie", "doresc demonstratie", "vreau o demonstratie",
+    "doresc o demonstratie", "vreau demonstrație", "doresc demonstrație",
+    "vreau o demonstrație", "doresc o demonstrație",
+    "programez o demonstratie", "rezerv o demonstratie",
+    "programare demo", "rezervare demo",
+    "schedule demo", "book a demo", "request a demo", "i want a demo",
+    "хочу демо", "хочу демонстрацию", "запишите на демо",
+}
+
+
+def _detect_demo_request_intent(text: str, api_key: str, model: str) -> bool:
+    """Returns True if user explicitly wants to schedule a demo (not just ask about it)."""
+    t = _normalize(text)
+    if any(kw in t for kw in _DEMO_REQUEST_KEYWORDS):
+        return True
+    if not api_key:
+        return False
+    classifier = LLMClient(api_key=api_key, model=model)
+    messages = [
+        {"role": "system", "content": (
+            "You are a STRICT classifier. "
+            "Context: RParking parking management system chatbot. "
+            "Determine if the user's message is an EXPLICIT REQUEST to schedule or book a demo — "
+            "NOT a question about what a demo is, NOT a question about its cost or process. "
+            "Examples that ARE a demo request: 'I want a demo', 'can you schedule a demo for me', "
+            "'am nevoie de demo', 'vreau sa programez o demonstratie', 'запишите меня на демо'. "
+            "Examples that are NOT: 'what is a demo?', 'how much does a demo cost?', "
+            "'do you offer demos?', 'cum functioneaza demonstratia?'. "
+            "Reply ONLY with: YES | NO. No other text."
+        )},
+        {"role": "user", "content": text},
+    ]
+    try:
+        result = classifier.chat(messages=messages).strip().upper()
+        return result == "YES"
+    except Exception:
+        return False
+
+
 def _extract_email(text: str) -> str | None:
     m = re.search(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)
     return m.group(0) if m else None
@@ -509,6 +550,15 @@ def chat():
             "Înțeles! Vă voi pune în legătură cu un manager RParking.\n"
             "Cum vă numiți, vă rog?"
         )
+
+    # ── Demo request intent check ────────────────────────────────────────────
+    if _detect_demo_request_intent(user_text, api_key, model):
+        _store.update_meta(conversation_id, {
+            "lead": {"active": True, "step": "name", "draft": {}},
+            "stage": "lead_capture",
+        })
+        _store.append(conversation_id, {"role": "user", "content": user_text})
+        return _respond("Super! Cum vă numiți, vă rog?")
 
     # ── Stage: chatting — KB + LLM, demo offer after every reply ─────────────
     history = _store.get(conversation_id)
