@@ -67,12 +67,29 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip().lower())
 
 
+_YES_WORDS = {
+    "da", "sigur", "ok", "bine", "desigur", "vreau", "doresc",
+    "haida", "hai", "merge", "mergem", "perfect", "absolut",
+    "evident", "neaparat", "super", "excelent", "gata",
+    "de acord", "in regula", "în regulă", "cu placere", "cu plăcere",
+    "fire", "lasam", "lăsăm", "incercam", "încercăm",
+}
+_YES_PHRASES = {
+    "sa incercam", "să încercăm", "sa mergem", "să mergem",
+    "de ce nu", "de ce nu?", "hai sa", "hai să",
+    "vreau sa incerc", "vreau să încerc",
+    "sounds good", "let's go", "sure", "yeah", "yep",
+}
+
+
 def _detect_yes(text: str) -> bool:
     t = _normalize(text)
+    if t in _YES_PHRASES or any(t.startswith(p) for p in _YES_PHRASES):
+        return True
     words = t.split()
-    if len(words) > 4:
+    if len(words) > 5:
         return False
-    return any(p in words for p in ["da", "sigur", "ok", "bine", "desigur", "vreau", "doresc"]) or t in {"yes", "y"}
+    return any(p in words for p in _YES_WORDS) or t in {"yes", "y"}
 
 
 def _detect_no(text: str) -> bool:
@@ -94,11 +111,13 @@ def _classify_yes_no(text: str, api_key: str, model: str) -> str:
     classifier = LLMClient(api_key=api_key, model=model)
     messages = [
         {"role": "system", "content": (
-            "Ești un clasificator STRICT. "
+            "Ești un clasificator. "
             "Contextul: botul RParking tocmai a întrebat utilizatorul: 'Doriți să programați o demonstrație RParking? (da / nu)'. "
-            "Determină dacă mesajul utilizatorului este EXPLICIT un răspuns POZITIV (confirmă că vrea demo) "
-            "sau EXPLICIT NEGATIV (refuză). "
-            "Dacă mesajul este o întrebare, un comentariu sau există ORICE dubiu, răspunde cu UNKNOWN. "
+            "Determină dacă mesajul utilizatorului acceptă (pozitiv) sau refuză (negativ) demonstrația. "
+            "Acceptă atât răspunsuri EXPLICITE cât și IMPLICITE pozitive — "
+            "ex: 'da', 'sigur', 'sa incercam', 'de ce nu', 'hai', 'merge', 'sounds good', 'почему нет' = YES. "
+            "Răspunsuri negative: 'nu', 'no', 'nu vreau', 'nu acum', 'lasă' = NO. "
+            "Returnează UNKNOWN doar dacă mesajul este clar o întrebare despre sistem sau complet off-topic. "
             "Răspunde DOAR cu: YES | NO | UNKNOWN. Fără text suplimentar."
         )},
         {"role": "user", "content": text},
