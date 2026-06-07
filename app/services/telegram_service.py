@@ -12,7 +12,10 @@ log = logging.getLogger(__name__)
 _API_BASE = "https://api.telegram.org"
 
 
-def send_lead_notification(lead: Lead) -> None:
+_LANG_LABELS = {"ro": "Română", "en": "Engleză", "ru": "Rusă"}
+
+
+def send_lead_notification(lead: Lead, lang: str = "ro") -> None:
     """Send a Telegram message with lead details to the configured chat.
 
     Raises ValueError if TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID are not set.
@@ -26,6 +29,7 @@ def send_lead_notification(lead: Lead) -> None:
     if not chat_id:
         raise ValueError("TELEGRAM_CHAT_ID is not set.")
 
+    lang_label = _LANG_LABELS.get(lang, lang)
     text = (
         f"🅿️ Lead nou RParking:\n"
         f"Nume: {lead.name}\n"
@@ -34,7 +38,8 @@ def send_lead_notification(lead: Lead) -> None:
         f"Email: {lead.email or '—'}\n"
         f"Nr. locuri parcare: {lead.nr_parking_spots or '—'}\n"
         f"Oraș: {lead.city or '—'}\n"
-        f"Tip proiect: {lead.project_type or '—'}"
+        f"Tip proiect: {lead.project_type or '—'}\n"
+        f"Limbă preferată: {lang_label}"
     )
 
     response = requests.post(
@@ -78,7 +83,7 @@ def send_transcript_document(*, lead_ref: str, messages: list[dict]) -> None:
     response.raise_for_status()
 
 
-def send_manager_transfer_notification(*, name: str, phone: str, subject: str) -> None:
+def send_manager_transfer_notification(*, name: str, phone: str, subject: str, lang: str = "ro") -> None:
     """Send a Telegram message when a user requests to speak with a manager.
 
     Raises ValueError if env vars are missing.
@@ -92,11 +97,13 @@ def send_manager_transfer_notification(*, name: str, phone: str, subject: str) -
     if not chat_id:
         raise ValueError("TELEGRAM_CHAT_ID is not set.")
 
+    lang_label = _LANG_LABELS.get(lang, lang)
     text = (
         f"🔔 Transfer Manager RParking:\n"
         f"Nume: {name or '—'}\n"
         f"Telefon: {phone or '—'}\n"
-        f"Subiect: {subject or '—'}"
+        f"Subiect: {subject or '—'}\n"
+        f"Limbă preferată: {lang_label}"
     )
 
     response = requests.post(

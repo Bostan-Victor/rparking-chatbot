@@ -40,11 +40,17 @@ _PROJECT_TYPES = [
 # Project type helpers
 # ---------------------------------------------------------------------------
 
+_PROJECT_TYPES_DISPLAY: dict[str, list[str]] = {
+    "ro": ["Sistem complet", "Sistem CardPass", "Sistem cu tichete", "Sistem QR Code", "Altul"],
+    "en": ["Complete System", "CardPass System", "Ticket System", "QR Code System", "Other"],
+    "ru": ["Полная система", "Система CardPass", "Система с талонами", "Система QR Code", "Другое"],
+}
+
 _PROJECT_TYPE_KEYWORDS: dict[str, set[str]] = {
-    "Sistem complet": {"complet", "integral", "toate", "tot", "full"},
-    "Sistem CardPass": {"cardpass", "card pass", "card", "rfid", "nfc", "abonament"},
-    "Sistem cu tichete": {"tichet", "tichete", "ticket", "bilet"},
-    "Sistem QR Code": {"qr", "qrcode", "qr code", "cod qr"},
+    "Sistem complet": {"complet", "integral", "toate", "tot", "full", "complete", "полная", "полный"},
+    "Sistem CardPass": {"cardpass", "card pass", "card", "rfid", "nfc", "abonament", "карта", "карточка"},
+    "Sistem cu tichete": {"tichet", "tichete", "ticket", "bilet", "ticketing", "талон", "талоны"},
+    "Sistem QR Code": {"qr", "qrcode", "qr code", "cod qr", "куар"},
 }
 
 
@@ -54,7 +60,7 @@ def _extract_project_type(text: str) -> str | None:
         for k in keywords:
             if k in t:
                 return label
-    if "altul" in t or "alt" in t or "alta" in t or "altceva" in t:
+    if any(k in t for k in ["altul", "alt", "alta", "altceva", "other", "else", "другое", "иное", "другой"]):
         return "Altul"
     return None
 
@@ -349,11 +355,11 @@ _S: dict[tuple[str, str], str] = {
     ("en", "lead_company_invalid"): "Please tell me your company name (min. 2 characters).",
     ("ru", "lead_company_invalid"): "Пожалуйста, укажите название компании (минимум 2 символа).",
     ("ro", "lead_ask_phone"): "Numărul dvs. de telefon? (ex: 07xx xxx xxx / +40...)",
-    ("en", "lead_ask_phone"): "Your phone number? (e.g. +40 7xx xxx xxx)",
-    ("ru", "lead_ask_phone"): "Ваш номер телефона? (например: +40 7xx xxx xxx)",
+    ("en", "lead_ask_phone"): "Your phone number? (e.g. 07xx xxx xxx / +40...)",
+    ("ru", "lead_ask_phone"): "Ваш номер телефона? (например: 07xx xxx xxx / +40...)",
     ("ro", "lead_phone_invalid"): "Nu am recunoscut un număr valid. Vă rog să îl scrieți din nou (ex: 07xx xxx xxx / +40...).",
-    ("en", "lead_phone_invalid"): "I didn't recognise a valid number. Please enter it again (e.g. +40 7xx xxx xxx).",
-    ("ru", "lead_phone_invalid"): "Не удалось распознать номер. Пожалуйста, введите снова (например: +40 7xx xxx xxx).",
+    ("en", "lead_phone_invalid"): "I didn't recognise a valid number. Please enter it again (e.g. 07xx xxx xxx / +40...).",
+    ("ru", "lead_phone_invalid"): "Не удалось распознать номер. Пожалуйста, введите снова (например: 07xx xxx xxx / +40...).",
     ("ro", "lead_ask_email"): "Adresa de email? (ex: nume@companie.ro)",
     ("en", "lead_ask_email"): "Your email address? (e.g. name@company.com)",
     ("ru", "lead_ask_email"): "Ваш адрес эл. почты? (например: name@company.com)",
@@ -401,11 +407,11 @@ _S: dict[tuple[str, str], str] = {
     ("en", "manager_name_invalid"): "Please tell me your name (min. 2 characters).",
     ("ru", "manager_name_invalid"): "Пожалуйста, укажите ваше имя (минимум 2 символа).",
     ("ro", "manager_ask_phone"): "Numărul dvs. de telefon? (ex: 07xx xxx xxx / +40...)",
-    ("en", "manager_ask_phone"): "Your phone number? (e.g. +40 7xx xxx xxx)",
-    ("ru", "manager_ask_phone"): "Ваш номер телефона? (например: +40 7xx xxx xxx)",
+    ("en", "manager_ask_phone"): "Your phone number? (e.g. 07xx xxx xxx / +40...)",
+    ("ru", "manager_ask_phone"): "Ваш номер телефона? (например: 07xx xxx xxx / +40...)",
     ("ro", "manager_phone_invalid"): "Nu am recunoscut un număr valid. Vă rog să îl scrieți din nou (ex: 07xx xxx xxx / +40...).",
-    ("en", "manager_phone_invalid"): "I didn't recognise a valid number. Please enter it again (e.g. +40 7xx xxx xxx).",
-    ("ru", "manager_phone_invalid"): "Не удалось распознать номер. Пожалуйста, введите снова (например: +40 7xx xxx xxx).",
+    ("en", "manager_phone_invalid"): "I didn't recognise a valid number. Please enter it again (e.g. 07xx xxx xxx / +40...).",
+    ("ru", "manager_phone_invalid"): "Не удалось распознать номер. Пожалуйста, введите снова (например: 07xx xxx xxx / +40...).",
     ("ro", "manager_ask_subject"): "Cu ce subiect doriți să vorbiți cu un manager RParking?",
     ("en", "manager_ask_subject"): "What subject would you like to discuss with an RParking manager?",
     ("ru", "manager_ask_subject"): "По какому вопросу вы хотите поговорить с менеджером RParking?",
@@ -520,6 +526,7 @@ def _handle_manager_transfer(conversation_id: str, user_text: str, meta: dict, l
                 name=draft.get("name", ""),
                 phone=draft.get("phone", ""),
                 subject=subject,
+                lang=lang,
             )
         except Exception as exc:
             current_app.logger.warning("Manager transfer notification failed: %s", exc)
@@ -602,7 +609,8 @@ def _handle_lead_capture(conversation_id: str, user_text: str, meta: dict, lang:
         if len(city) < 2:
             return _t(lang, "lead_city_invalid")
         draft["city"] = city
-        types_str = " / ".join(_PROJECT_TYPES)
+        display_types = _PROJECT_TYPES_DISPLAY.get(lang, _PROJECT_TYPES_DISPLAY["ro"])
+        types_str = " / ".join(display_types)
         lead_state.update({"step": "project_type", "draft": draft})
         _store.update_meta(conversation_id, {"lead": lead_state})
         return _t(lang, "lead_ask_type").format(types=types_str)
@@ -633,7 +641,7 @@ def _handle_lead_capture(conversation_id: str, user_text: str, meta: dict, lang:
             return _t(lang, "lead_error")
 
         try:
-            send_lead_notification(lead)
+            send_lead_notification(lead, lang)
         except Exception as exc:
             current_app.logger.warning("Telegram lead notification failed: %s", exc)
 
