@@ -144,11 +144,7 @@ def _detect_no(text: str) -> bool:
 
 
 def _classify_yes_no(text: str, api_key: str, model: str) -> str:
-    """LLM-based yes/no classifier. Returns 'YES', 'NO', or 'UNKNOWN'."""
-    if _detect_yes(text):
-        return "YES"
-    if _detect_no(text):
-        return "NO"
+    """LLM-only yes/no classifier. Returns 'YES', 'NO', or 'UNKNOWN'."""
     if not api_key:
         return "UNKNOWN"
     classifier = LLMClient(api_key=api_key, model=model)
@@ -172,6 +168,55 @@ def _classify_yes_no(text: str, api_key: str, model: str) -> str:
         return "UNKNOWN"
     except Exception:
         return "UNKNOWN"
+
+
+def _classify_message_type(text: str, api_key: str, model: str) -> str:
+    """Classify user message as GREETING, QUESTION, or OTHER using LLM."""
+    if not api_key:
+        return "QUESTION"
+    classifier = LLMClient(api_key=api_key, model=model)
+    messages = [
+        {"role": "system", "content": (
+            "You are a message classifier. "
+            "Classify the user's message into exactly one of: "
+            "GREETING (any salutation: hello, hi, hey, bun\u0103, salut, privet, zdravstvuyte, bun\u0103 ziua, etc.), "
+            "QUESTION (asking about a product, system, price, feature, or any informational query), "
+            "OTHER (statements, feedback, or anything not clearly a greeting or question). "
+            "The user may write in Romanian, English, or Russian. "
+            "Reply ONLY with one word: GREETING, QUESTION, or OTHER. No explanation."
+        )},
+        {"role": "user", "content": text},
+    ]
+    try:
+        result = classifier.chat(messages=messages).strip().upper()
+        if result in {"GREETING", "QUESTION", "OTHER"}:
+            return result
+        return "OTHER"
+    except Exception:
+        return "OTHER"
+
+
+def _greeting_llm_reply(user_text: str, lang: str, api_key: str, model: str) -> str:
+    """Generate a warm, brief greeting reply in the correct language via LLM."""
+    lang_instruction = _LANG_RESPONSE_INSTRUCTION.get(lang, _LANG_RESPONSE_INSTRUCTION["ro"])
+    client = LLMClient(api_key=api_key, model=model)
+    messages = [
+        {"role": "system", "content": (
+            "E\u0219ti un asistent virtual prietenos pentru RParking, o companie de solu\u021bii de management al parc\u0103rilor. "
+            "Utilizatorul te-a salutat. R\u0103spunde scurt \u0219i prietenos \u0219i invit\u0103-l s\u0103 pun\u0103 \u00eentreb\u0103ri despre produsele RParking. "
+            "Nu men\u021biona demonstra\u021bii, demo-uri sau program\u0103ri. "
+            f"{lang_instruction}"
+        )},
+        {"role": "user", "content": user_text},
+    ]
+    try:
+        return _strip_leading_padding(client.chat(messages=messages))
+    except Exception:
+        return {
+            "ro": "Bun\u0103! Cu ce v\u0103 pot ajuta ast\u0103zi?",
+            "en": "Hello! How can I help you today?",
+            "ru": "\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435! \u0427\u0435\u043c \u043c\u043e\u0433\u0443 \u043f\u043e\u043c\u043e\u0447\u044c?",
+        }.get(lang, "Bun\u0103! Cu ce v\u0103 pot ajuta ast\u0103zi?")
 
 
 def _last_message_had_demo_offer(text: str | None) -> bool:
@@ -199,6 +244,8 @@ def _detect_demo_request_intent(text: str, api_key: str, model: str) -> bool:
     t = _normalize(text)
     if any(kw in t for kw in _DEMO_REQUEST_KEYWORDS):
         return True
+    if len(t.split()) <= 3:
+        return False
     if not api_key:
         return False
     classifier = LLMClient(api_key=api_key, model=model)
@@ -468,6 +515,8 @@ def _detect_manager_intent(text: str, api_key: str, model: str) -> bool:
     t = _normalize(text)
     if any(kw in t for kw in _MANAGER_KEYWORDS):
         return True
+    if len(t.split()) <= 3:
+        return False
     if not api_key:
         return False
     classifier = LLMClient(api_key=api_key, model=model)
@@ -765,8 +814,9 @@ def chat():
     history = _store.get(conversation_id)
     last_assistant = _last_assistant_message(history)
 
-    # Check if user is responding to a demo offer
     if _last_message_had_demo_offer(last_assistant):
+        # LLM-only yes/no: no keyword shortcuts — avoids false positives from
+        # words like "doresc" appearing in a new, unrelated question.
         yn = _classify_yes_no(user_text, api_key, model)
         if yn == "YES":
             _store.update_meta(conversation_id, {
@@ -778,7 +828,13 @@ def chat():
         if yn == "NO":
             _store.append(conversation_id, {"role": "user", "content": user_text})
             return _respond(_t(lang, "demo_no"))
-        # UNKNOWN → user ignored offer, fall through to answer normally
+        # UNKNOWN → user sent a new question, fall through to KB+LLM
+    else:
+        # Only check for greetings when the last bot message was NOT the demo offer
+        msg_type = _classify_message_type(user_text, api_key, model)
+        if msg_type == "GREETING":
+            _store.append(conversation_id, {"role": "user", "content": user_text})
+            return _respond(_greeting_llm_reply(user_text, lang, api_key, model))
 
     # KB + LLM answer
     try:
