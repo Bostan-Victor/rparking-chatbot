@@ -27,8 +27,14 @@ def is_valid_phone(value: str | None) -> bool:
         return False
 
     digits = phone_digits(v)
-    # Moldova: 8 significant digits; 9 with leading 0 (068...); 11 with +373 country code.
-    return len(digits) in {8, 9, 11}
+    n = len(digits)
+    # Moldova: exactly 8 significant digits.
+    # 0XXXXXXXX (9 digits, domestic) or +373XXXXXXXX (11 digits, international).
+    if n == 9 and digits[0] == "0":
+        return True
+    if n == 11 and digits.startswith("373"):
+        return True
+    return False
 
 
 def parse_locations_count_strict(value: object) -> int | None:
