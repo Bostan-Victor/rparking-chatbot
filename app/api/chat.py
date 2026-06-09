@@ -88,6 +88,11 @@ _EN_STOPWORDS = {
     "your", "our", "their", "its", "his", "her", "when", "where",
     "which", "who", "than", "then", "there", "here", "into",
     "like", "just", "know", "use", "work", "make", "see", "also",
+    "hello", "hi", "hey", "greetings", "howdy",
+}
+_RU_LATIN_WORDS = {
+    "privet", "privyet", "prevet", "zdravstvuyte", "zdrastvuyte",
+    "spasibo", "pozhaluysta", "kak dela", "dobriy den",
 }
 _RO_DIACRITICS = "ăâîșțĂÂÎȘȚ"
 
@@ -97,6 +102,8 @@ def _detect_language(text: str) -> str:
     if re.search(r"[\u0400-\u04FF]", text):
         return "ru"
     words = set(_normalize(text).split())
+    if words & _RU_LATIN_WORDS:
+        return "ru"
     if words & _EN_STOPWORDS and not any(c in text for c in _RO_DIACRITICS):
         return "en"
     return "ro"
@@ -202,9 +209,9 @@ def _greeting_llm_reply(user_text: str, lang: str, api_key: str, model: str) -> 
     client = LLMClient(api_key=api_key, model=model)
     messages = [
         {"role": "system", "content": (
-            "E\u0219ti un asistent virtual prietenos pentru RParking, o companie de solu\u021bii de management al parc\u0103rilor. "
-            "Utilizatorul te-a salutat. R\u0103spunde scurt \u0219i prietenos \u0219i invit\u0103-l s\u0103 pun\u0103 \u00eentreb\u0103ri despre produsele RParking. "
-            "Nu men\u021biona demonstra\u021bii, demo-uri sau program\u0103ri. "
+            "You are a friendly virtual assistant for RParking, a parking management solutions company. "
+            "The user has greeted you. Respond warmly and briefly, inviting them to ask questions about RParking products. "
+            "Do NOT mention demonstrations, demos, or scheduling. "
             f"{lang_instruction}"
         )},
         {"role": "user", "content": user_text},
@@ -770,7 +777,7 @@ def chat():
         # Only switch language on substantive messages; short replies (yes/no/ok)
         # inherit the stored language to avoid false-switching on single words.
         if (len(_msg_words) >= 3
-                or detected == "ru"
+                or detected in ("ru", "en")
                 or any(c in user_text for c in _RO_DIACRITICS)):
             lang = detected
             _store.update_meta(conversation_id, {"lang": lang})
