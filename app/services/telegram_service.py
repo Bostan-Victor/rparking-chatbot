@@ -33,10 +33,7 @@ def send_lead_notification(lead: Lead, lang: str = "ro") -> None:
     text = (
         f"🅿️ Lead nou RParking:\n"
         f"Nume: {lead.name}\n"
-        f"Companie: {lead.company or '—'}\n"
         f"Telefon: {lead.phone or '—'}\n"
-        f"Email: {lead.email or '—'}\n"
-        f"Nr. locuri parcare: {lead.nr_parking_spots or '—'}\n"
         f"Oraș: {lead.city or '—'}\n"
         f"Tip proiect: {lead.project_type or '—'}\n"
         f"Limbă preferată: {lang_label}"

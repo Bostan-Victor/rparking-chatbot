@@ -385,27 +385,12 @@ _S: dict[tuple[str, str], str] = {
     ("ro", "lead_name_invalid"): "Vă rog să îmi spuneți numele dvs. (minim 2 caractere).",
     ("en", "lead_name_invalid"): "Please tell me your name (min. 2 characters).",
     ("ru", "lead_name_invalid"): "Пожалуйста, укажите ваше имя (минимум 2 символа).",
-    ("ro", "lead_ask_company"): "Compania / Organizația dvs.?",
-    ("en", "lead_ask_company"): "Your company / organization?",
-    ("ru", "lead_ask_company"): "Ваша компания / организация?",
-    ("ro", "lead_company_invalid"): "Vă rog să îmi spuneți numele companiei (minim 2 caractere).",
-    ("en", "lead_company_invalid"): "Please tell me your company name (min. 2 characters).",
-    ("ru", "lead_company_invalid"): "Пожалуйста, укажите название компании (минимум 2 символа).",
-    ("ro", "lead_ask_phone"): "Numărul dvs. de telefon? (ex: 06x/07x xxx xxx / +373...)",
-    ("en", "lead_ask_phone"): "Your phone number? (e.g. 06x/07x xxx xxx / +373...)",
-    ("ru", "lead_ask_phone"): "Ваш номер телефона? (например: 06x/07x xxx xxx / +373...)",
-    ("ro", "lead_phone_invalid"): "Nu am recunoscut un număr valid. Vă rog să îl scrieți din nou (ex: 06x/07x xxx xxx / +373...).",
-    ("en", "lead_phone_invalid"): "I didn't recognise a valid number. Please enter it again (e.g. 06x/07x xxx xxx / +373...).",
-    ("ru", "lead_phone_invalid"): "Не удалось распознать номер. Пожалуйста, введите снова (например: 06x/07x xxx xxx / +373...).",
-    ("ro", "lead_ask_email"): "Adresa de email? (ex: nume@companie.ro)",
-    ("en", "lead_ask_email"): "Your email address? (e.g. name@company.com)",
-    ("ru", "lead_ask_email"): "Ваш адрес эл. почты? (например: name@company.com)",
-    ("ro", "lead_email_invalid"): "Nu am recunoscut un email valid. Scrieți adresa (ex: nume@companie.ro) sau scrieți 'nu am'.",
-    ("en", "lead_email_invalid"): "I didn't recognise a valid email. Enter your address or type 'skip'.",
-    ("ru", "lead_email_invalid"): "Не удалось распознать email. Введите адрес или напишите 'нет'.",
-    ("ro", "lead_ask_spots"): "Câte locuri de parcare are proiectul dvs.? (număr aproximativ)",
-    ("en", "lead_ask_spots"): "How many parking spots does your project have? (approximate number)",
-    ("ru", "lead_ask_spots"): "Сколько парковочных мест в вашем проекте? (приблизительно)",
+    ("ro", "lead_ask_phone"): "Numărul dvs. de telefon? (ex: 068 123 456 / +373 68 123 456)",
+    ("en", "lead_ask_phone"): "Your phone number? (e.g. 068 123 456 / +373 68 123 456)",
+    ("ru", "lead_ask_phone"): "Ваш номер телефона? (например: 068 123 456 / +373 68 123 456)",
+    ("ro", "lead_phone_invalid"): "Nu am recunoscut un număr valid. Vă rog să îl scrieți din nou (ex: 068 123 456 / +373 68 123 456).",
+    ("en", "lead_phone_invalid"): "I didn't recognise a valid number. Please enter it again (e.g. 068 123 456 / +373 68 123 456).",
+    ("ru", "lead_phone_invalid"): "Не удалось распознать номер. Пожалуйста, введите снова (например: 068 123 456 / +373 68 123 456).",
     ("ro", "lead_ask_city"): "În ce oraș/localitate se află parcarea?",
     ("en", "lead_ask_city"): "In what city / location is the parking?",
     ("ru", "lead_ask_city"): "В каком городе / населённом пункте находится парковка?",
@@ -602,15 +587,6 @@ def _handle_lead_capture(conversation_id: str, user_text: str, meta: dict, lang:
         if len(name) < 2:
             return _t(lang, "lead_name_invalid")
         draft["name"] = name
-        lead_state.update({"step": "company", "draft": draft})
-        _store.update_meta(conversation_id, {"lead": lead_state})
-        return _t(lang, "lead_ask_company")
-
-    if step == "company":
-        company = user_text.strip()
-        if len(company) < 2:
-            return _t(lang, "lead_company_invalid")
-        draft["company"] = company
         lead_state.update({"step": "phone", "draft": draft})
         _store.update_meta(conversation_id, {"lead": lead_state})
         return _t(lang, "lead_ask_phone")
@@ -619,26 +595,6 @@ def _handle_lead_capture(conversation_id: str, user_text: str, meta: dict, lang:
         if not is_valid_phone(user_text.strip()):
             return _t(lang, "lead_phone_invalid")
         draft["phone"] = user_text.strip()
-        lead_state.update({"step": "email", "draft": draft})
-        _store.update_meta(conversation_id, {"lead": lead_state})
-        return _t(lang, "lead_ask_email")
-
-    if step == "email":
-        t = _normalize(user_text)
-        if any(k in t for k in ["nu am", "skip", "fara", "fără", "sari", "none", "no email", "нет", "пропустить", "без"]):
-            draft["email"] = None
-        else:
-            email = _extract_email(user_text)
-            if not email or not is_valid_email(email):
-                return _t(lang, "lead_email_invalid")
-            draft["email"] = email
-        lead_state.update({"step": "nr_spots", "draft": draft})
-        _store.update_meta(conversation_id, {"lead": lead_state})
-        return _t(lang, "lead_ask_spots")
-
-    if step == "nr_spots":
-        m = re.search(r"\d+", user_text)
-        draft["nr_parking_spots"] = int(m.group(0)) if m else None
         lead_state.update({"step": "city", "draft": draft})
         _store.update_meta(conversation_id, {"lead": lead_state})
         return _t(lang, "lead_ask_city")
@@ -664,10 +620,7 @@ def _handle_lead_capture(conversation_id: str, user_text: str, meta: dict, lang:
 
         payload = {
             "name": draft.get("name"),
-            "company": draft.get("company"),
             "phone": draft.get("phone"),
-            "email": draft.get("email"),
-            "nr_parking_spots": draft.get("nr_parking_spots"),
             "city": draft.get("city"),
             "project_type": pt,
         }
@@ -687,7 +640,7 @@ def _handle_lead_capture(conversation_id: str, user_text: str, meta: dict, lang:
         try:
             history = _store.get(conversation_id)
             send_transcript_document(
-                lead_ref=f"Lead #{lead.id} — {draft.get('company', 'necunoscut')}",
+                lead_ref=f"Lead #{lead.id} — {draft.get('name', 'necunoscut')}",
                 messages=history,
             )
         except Exception as exc:
