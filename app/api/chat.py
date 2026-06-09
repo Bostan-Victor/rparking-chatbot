@@ -301,7 +301,7 @@ _LANG_RESPONSE_INSTRUCTION = {
 def _system_prompt(lang: str = "ro") -> str:
     lang_instr = _LANG_RESPONSE_INSTRUCTION.get(lang, _LANG_RESPONSE_INSTRUCTION["ro"])
     return (
-        "Ești un asistent virtual pentru RParking, o companie din România care oferă soluții complete "
+        "Ești un asistent virtual pentru RParking, o companie din Republica Moldova care oferă soluții complete "
         "de management al parcărilor: Entry Point, Exit Point, Pay Point, BackOffice Software, "
         "integrare NFC, QR Code, Card Access, emitere tichete, plăți numerar și card.\n\n"
         "Scopul tău:\n"
@@ -391,12 +391,12 @@ _S: dict[tuple[str, str], str] = {
     ("ro", "lead_company_invalid"): "Vă rog să îmi spuneți numele companiei (minim 2 caractere).",
     ("en", "lead_company_invalid"): "Please tell me your company name (min. 2 characters).",
     ("ru", "lead_company_invalid"): "Пожалуйста, укажите название компании (минимум 2 символа).",
-    ("ro", "lead_ask_phone"): "Numărul dvs. de telefon? (ex: 07xx xxx xxx / +40...)",
-    ("en", "lead_ask_phone"): "Your phone number? (e.g. 07xx xxx xxx / +40...)",
-    ("ru", "lead_ask_phone"): "Ваш номер телефона? (например: 07xx xxx xxx / +40...)",
-    ("ro", "lead_phone_invalid"): "Nu am recunoscut un număr valid. Vă rog să îl scrieți din nou (ex: 07xx xxx xxx / +40...).",
-    ("en", "lead_phone_invalid"): "I didn't recognise a valid number. Please enter it again (e.g. 07xx xxx xxx / +40...).",
-    ("ru", "lead_phone_invalid"): "Не удалось распознать номер. Пожалуйста, введите снова (например: 07xx xxx xxx / +40...).",
+    ("ro", "lead_ask_phone"): "Numărul dvs. de telefon? (ex: 06x/07x xxx xxx / +373...)",
+    ("en", "lead_ask_phone"): "Your phone number? (e.g. 06x/07x xxx xxx / +373...)",
+    ("ru", "lead_ask_phone"): "Ваш номер телефона? (например: 06x/07x xxx xxx / +373...)",
+    ("ro", "lead_phone_invalid"): "Nu am recunoscut un număr valid. Vă rog să îl scrieți din nou (ex: 06x/07x xxx xxx / +373...).",
+    ("en", "lead_phone_invalid"): "I didn't recognise a valid number. Please enter it again (e.g. 06x/07x xxx xxx / +373...).",
+    ("ru", "lead_phone_invalid"): "Не удалось распознать номер. Пожалуйста, введите снова (например: 06x/07x xxx xxx / +373...).",
     ("ro", "lead_ask_email"): "Adresa de email? (ex: nume@companie.ro)",
     ("en", "lead_ask_email"): "Your email address? (e.g. name@company.com)",
     ("ru", "lead_ask_email"): "Ваш адрес эл. почты? (например: name@company.com)",
@@ -443,12 +443,12 @@ _S: dict[tuple[str, str], str] = {
     ("ro", "manager_name_invalid"): "Vă rog să îmi spuneți numele dvs. (minim 2 caractere).",
     ("en", "manager_name_invalid"): "Please tell me your name (min. 2 characters).",
     ("ru", "manager_name_invalid"): "Пожалуйста, укажите ваше имя (минимум 2 символа).",
-    ("ro", "manager_ask_phone"): "Numărul dvs. de telefon? (ex: 07xx xxx xxx / +40...)",
-    ("en", "manager_ask_phone"): "Your phone number? (e.g. 07xx xxx xxx / +40...)",
-    ("ru", "manager_ask_phone"): "Ваш номер телефона? (например: 07xx xxx xxx / +40...)",
-    ("ro", "manager_phone_invalid"): "Nu am recunoscut un număr valid. Vă rog să îl scrieți din nou (ex: 07xx xxx xxx / +40...).",
-    ("en", "manager_phone_invalid"): "I didn't recognise a valid number. Please enter it again (e.g. 07xx xxx xxx / +40...).",
-    ("ru", "manager_phone_invalid"): "Не удалось распознать номер. Пожалуйста, введите снова (например: 07xx xxx xxx / +40...).",
+    ("ro", "manager_ask_phone"): "Numărul dvs. de telefon? (ex: 06x/07x xxx xxx / +373...)",
+    ("en", "manager_ask_phone"): "Your phone number? (e.g. 06x/07x xxx xxx / +373...)",
+    ("ru", "manager_ask_phone"): "Ваш номер телефона? (например: 06x/07x xxx xxx / +373...)",
+    ("ro", "manager_phone_invalid"): "Nu am recunoscut un număr valid. Vă rog să îl scrieți din nou (ex: 06x/07x xxx xxx / +373...).",
+    ("en", "manager_phone_invalid"): "I didn't recognise a valid number. Please enter it again (e.g. 06x/07x xxx xxx / +373...).",
+    ("ru", "manager_phone_invalid"): "Не удалось распознать номер. Пожалуйста, введите снова (например: 06x/07x xxx xxx / +373...).",
     ("ro", "manager_ask_subject"): "Cu ce subiect doriți să vorbiți cu un manager RParking?",
     ("en", "manager_ask_subject"): "What subject would you like to discuss with an RParking manager?",
     ("ru", "manager_ask_subject"): "По какому вопросу вы хотите поговорить с менеджером RParking?",
