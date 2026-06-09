@@ -73,41 +73,6 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip().lower())
 
 
-# ---------------------------------------------------------------------------
-# Language detection
-# ---------------------------------------------------------------------------
-
-_EN_STOPWORDS = {
-    "the", "is", "are", "how", "what", "do", "can", "i", "you",
-    "please", "need", "want", "my", "have", "does", "it",
-    "this", "that", "a", "an", "and", "or", "for", "of", "with",
-    "me", "about", "tell", "show", "get", "give", "let", "more",
-    "some", "any", "all", "at", "in", "on", "by", "we", "they",
-    "he", "she", "was", "will", "would", "has", "had", "been",
-    "be", "not", "but", "so", "if", "as", "up", "out",
-    "your", "our", "their", "its", "his", "her", "when", "where",
-    "which", "who", "than", "then", "there", "here", "into",
-    "like", "just", "know", "use", "work", "make", "see", "also",
-    "hello", "hi", "hey", "greetings", "howdy",
-}
-_RU_LATIN_WORDS = {
-    "privet", "privyet", "prevet", "zdravstvuyte", "zdrastvuyte",
-    "spasibo", "pozhaluysta", "kak dela", "dobriy den",
-}
-_RO_DIACRITICS = "ăâîșțĂÂÎȘȚ"
-
-
-def _detect_language(text: str) -> str:
-    """Detect language from text. Returns 'ro', 'en', or 'ru'. Default: 'ro'."""
-    if re.search(r"[\u0400-\u04FF]", text):
-        return "ru"
-    words = set(_normalize(text).split())
-    if words & _RU_LATIN_WORDS:
-        return "ru"
-    if words & _EN_STOPWORDS and not any(c in text for c in _RO_DIACRITICS):
-        return "en"
-    return "ro"
-
 
 _YES_WORDS = {
     "da", "sigur", "ok", "bine", "desigur", "vreau", "doresc",
@@ -177,30 +142,48 @@ def _classify_yes_no(text: str, api_key: str, model: str) -> str:
         return "UNKNOWN"
 
 
-def _classify_message_type(text: str, api_key: str, model: str) -> str:
-    """Classify user message as GREETING, QUESTION, or OTHER using LLM."""
+def _classify_message(text: str, api_key: str, model: str) -> tuple[str, str]:
+    """Classify message type and detect language in one LLM call.
+
+    Returns (type, lang):
+    - type: 'GREETING' | 'QUESTION' | 'OTHER'
+    - lang: 'ro' | 'en' | 'ru'
+    """
     if not api_key:
-        return "QUESTION"
+        return ("QUESTION", "ro")
     classifier = LLMClient(api_key=api_key, model=model)
     messages = [
         {"role": "system", "content": (
-            "You are a message classifier. "
-            "Classify the user's message into exactly one of: "
-            "GREETING (any salutation: hello, hi, hey, bun\u0103, salut, privet, zdravstvuyte, bun\u0103 ziua, etc.), "
-            "QUESTION (asking about a product, system, price, feature, or any informational query), "
-            "OTHER (statements, feedback, or anything not clearly a greeting or question). "
-            "The user may write in Romanian, English, or Russian. "
-            "Reply ONLY with one word: GREETING, QUESTION, or OTHER. No explanation."
+            "You are a message classifier. Classify the user's message and detect its language.\n"
+            "Reply with exactly: TYPE|LANG on a single line. No other text.\n\n"
+            "TYPE must be one of:\n"
+            "  GREETING — any salutation (hello, hi, bun\u0103, salut, privet, привет, zdravstvuyte, etc.)\n"
+            "  QUESTION — asking about a product, system, price, feature, or any informational query\n"
+            "  OTHER    — statements, feedback, or anything not a greeting or question\n\n"
+            "LANG must be one of: ro (Romanian), en (English), ru (Russian — including transliterated like 'privet')\n\n"
+            "Examples:\n"
+            "  hello                     → GREETING|en\n"
+            "  privet                    → GREETING|ru\n"
+            "  bun\u0103 ziua                 → GREETING|ro\n"
+            "  how does the system work? → QUESTION|en\n"
+            "  ce sisteme aveti          → QUESTION|ro\n"
+            "  \u043a\u0430\u043a \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442 \u043e\u043f\u043b\u0430\u0442\u0430             → QUESTION|ru\n"
+            "  ok                        → OTHER|ro\n"
+            "  thanks                    → OTHER|en\n"
         )},
         {"role": "user", "content": text},
     ]
     try:
-        result = classifier.chat(messages=messages).strip().upper()
-        if result in {"GREETING", "QUESTION", "OTHER"}:
-            return result
-        return "OTHER"
+        raw = classifier.chat(messages=messages).strip().upper()
+        parts = raw.split("|")
+        if len(parts) == 2:
+            msg_type = parts[0].strip()
+            lang = parts[1].strip().lower()
+            if msg_type in {"GREETING", "QUESTION", "OTHER"} and lang in {"ro", "en", "ru"}:
+                return (msg_type, lang)
+        return ("QUESTION", "ro")
     except Exception:
-        return "OTHER"
+        return ("QUESTION", "ro")
 
 
 def _greeting_llm_reply(user_text: str, lang: str, api_key: str, model: str) -> str:
@@ -764,25 +747,17 @@ def chat():
     api_key = current_app.config.get("OPENAI_API_KEY", "")
     model = current_app.config.get("OPENAI_MODEL", "gpt-4o-mini")
 
-    # ── Language detection (locked during any active capture flow) ────────────
+    # ── Language detection + message classification ───────────────────────────
     is_capture_active = (
         meta.get("lead", {}).get("active")
         or meta.get("manager_transfer", {}).get("active")
     )
     if is_capture_active:
         lang = meta.get("lang", "ro")
+        msg_type = None
     else:
-        detected = _detect_language(user_text)
-        _msg_words = user_text.strip().split()
-        # Only switch language on substantive messages; short replies (yes/no/ok)
-        # inherit the stored language to avoid false-switching on single words.
-        if (len(_msg_words) >= 3
-                or detected in ("ru", "en")
-                or any(c in user_text for c in _RO_DIACRITICS)):
-            lang = detected
-            _store.update_meta(conversation_id, {"lang": lang})
-        else:
-            lang = meta.get("lang", "ro")
+        msg_type, lang = _classify_message(user_text, api_key, model)
+        _store.update_meta(conversation_id, {"lang": lang})
 
     def _respond(reply: str) -> object:
         _store.append(conversation_id, {"role": "assistant", "content": reply})
@@ -838,7 +813,6 @@ def chat():
         # UNKNOWN → user sent a new question, fall through to KB+LLM
     else:
         # Only check for greetings when the last bot message was NOT the demo offer
-        msg_type = _classify_message_type(user_text, api_key, model)
         if msg_type == "GREETING":
             _store.append(conversation_id, {"role": "user", "content": user_text})
             return _respond(_greeting_llm_reply(user_text, lang, api_key, model))
