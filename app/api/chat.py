@@ -419,19 +419,16 @@ _S: dict[tuple[str, str], str] = {
     ("ro", "lead_done"): (
         "Mulțumesc! Am înregistrat datele dvs.\n"
         "Un consultant RParking vă va contacta în cel mai scurt timp pentru a stabili detaliile demonstrației.\n\n"
-        "Puteți folosi și calendarul din interfață pentru a alege direct o dată și oră disponibilă.\n\n"
         "Vă mulțumim că ați contactat RParking. O zi bună!"
     ),
     ("en", "lead_done"): (
         "Thank you! We have recorded your details.\n"
         "An RParking consultant will contact you shortly to arrange the demo.\n\n"
-        "You can also use the calendar in the interface to choose a date and time directly.\n\n"
         "Thank you for contacting RParking. Have a great day!"
     ),
     ("ru", "lead_done"): (
         "Спасибо! Ваши данные записаны.\n"
         "Консультант RParking свяжется с вами в ближайшее время для согласования деталей демонстрации.\n\n"
-        "Вы также можете воспользоваться календарём в интерфейсе для выбора удобных даты и времени.\n\n"
         "Спасибо, что обратились в RParking. Хорошего дня!"
     ),
     ("ro", "lead_error"): "A apărut o problemă la salvarea datelor. Puteți încerca din nou sau ne contactați direct.",
