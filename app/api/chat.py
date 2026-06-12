@@ -320,12 +320,28 @@ def _system_prompt(lang: str = "ro") -> str:
     )
 
 
-def _greeting() -> str:
-    return (
+def _greeting(lang: str = "ro") -> str:
+    return {
+        "ro": (
+            "Bună! Sunt asistentul virtual RParking.\n"
+            "Vă pot ajuta cu informații despre soluțiile noastre de management al parcărilor.\n\n"
+            "Cu ce vă pot ajuta astăzi?"
+        ),
+        "en": (
+            "Hello! I'm the RParking virtual assistant.\n"
+            "I can help you with information about our parking management solutions.\n\n"
+            "How can I help you today?"
+        ),
+        "ru": (
+            "Здравствуйте! Я виртуальный ассистент RParking.\n"
+            "Могу помочь вам с информацией о наших решениях для управления парковками.\n\n"
+            "Чем могу помочь?"
+        ),
+    }.get(lang, (
         "Bună! Sunt asistentul virtual RParking.\n"
         "Vă pot ajuta cu informații despre soluțiile noastre de management al parcărilor.\n\n"
         "Cu ce vă pot ajuta astăzi?"
-    )
+    ))
 
 
 # ---------------------------------------------------------------------------
@@ -661,16 +677,19 @@ def chat():
     conversation_id = payload.get("conversation_id")
     message = payload.get("message")
 
-    # First call: create conversation and return greeting (always Romanian)
+    # First call: create conversation and return greeting in requested language
     if not conversation_id:
-        greeting = _greeting()
+        lang = payload.get("lang", "ro")
+        if lang not in {"ro", "en", "ru"}:
+            lang = "ro"
+        greeting = _greeting(lang)
         conversation_id = _store.create(initial_messages=[
-            {"role": "system", "content": _system_prompt("ro")},
+            {"role": "system", "content": _system_prompt(lang)},
             {"role": "assistant", "content": greeting},
         ])
         _store.update_meta(conversation_id, {
             "stage": "chatting",
-            "lang": "ro",
+            "lang": lang,
             "lead": {"active": False, "step": None, "draft": {}},
             "manager_transfer": {"active": False, "step": None, "draft": {}},
         })
